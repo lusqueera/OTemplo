@@ -169,10 +169,27 @@ function DefaultTemplatesSection({ onUseTemplate }) {
   const handleUse = async (tpl) => {
     setLoadingId(tpl.id);
     try {
-      const res = await fetchExercises({ bodyParts: tpl.bodyParts[0], limit: 25 });
-      const apiExercises = res?.data || [];
+      // Busca exercícios de todos os bodyParts do template (não apenas o primeiro)
+      const allExercises = [];
+      for (const bp of tpl.bodyParts) {
+        const res = await fetchExercises({ bodyParts: bp, limit: 50 });
+        if (res?.data) allExercises.push(...res.data);
+      }
+
       const mapped = tpl.defaultExercises.map(de => {
-        const match = apiExercises.find(ae => ae.name.toLowerCase().includes(de.name.split(' ').slice(0, 2).join(' ').toLowerCase()));
+        // Matching melhorado: tenta por nome completo, depois por palavras individuais
+        const searchWords = de.name.toLowerCase().split(' ');
+        const match = allExercises.find(ae => {
+          const apiName = ae.name.toLowerCase();
+          // Match exato ou se o nome da API contém todas as palavras-chave
+          return apiName === de.name.toLowerCase() || searchWords.every(w => apiName.includes(w));
+        }) || allExercises.find(ae => {
+          const apiName = ae.name.toLowerCase();
+          // Fallback: qualquer exercício que contenha pelo menos a palavra principal (a mais longa)
+          const mainWord = searchWords.reduce((a, b) => a.length >= b.length ? a : b, '');
+          return mainWord.length >= 4 && apiName.includes(mainWord);
+        });
+
         if (match) {
           return {
             exerciseId: match.exerciseId, name: match.name, gifUrl: match.gifUrl,
