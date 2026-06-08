@@ -14,6 +14,7 @@ export async function GET() {
     });
     return NextResponse.json(users);
   } catch (error) {
+    console.error('Error fetching users:', error);
     return NextResponse.json({ error: 'Erro ao buscar usuários' }, { status: 500 });
   }
 }
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ id: user.id, name: user.name, email: user.email }, { status: 201 });
   } catch (error) {
+    console.error('Error creating user:', error);
     return NextResponse.json({ error: 'Erro ao criar usuário' }, { status: 500 });
   }
 }
