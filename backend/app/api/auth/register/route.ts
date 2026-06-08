@@ -4,7 +4,7 @@ import { prisma } from '../../../../lib/prisma';
 // POST /api/auth/register — Cria novo usuário no Postgres
 export async function POST(request: Request) {
   try {
-    const { name, email, password, role } = await request.json();
+    const { name, email, password } = await request.json();
 
     // Verifica se email já existe
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -12,9 +12,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email já cadastrado' }, { status: 409 });
     }
 
-    // Verifica se é o primeiro usuário (será admin)
+    // Apenas o primeiro usuário do sistema é admin. Todos os demais são 'user'.
     const count = await prisma.user.count();
-    const userRole = count === 0 ? 'admin' : (role || 'user');
+    const userRole = count === 0 ? 'admin' : 'user';
 
     const user = await prisma.user.create({
       data: { name, email, password, role: userRole }
