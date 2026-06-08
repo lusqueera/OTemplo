@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { apiCreate, apiUpdate, apiDelete } from './sync';
+import { apiFetch } from '../lib/api';
 
 const persist = (key, fn) => (set, get) => {
   const stored = localStorage.getItem(key);
@@ -411,29 +412,33 @@ export const useAuthStore = create((set, get) => {
     _users: users,
 
     register: async ({ name, email, password }) => {
-      const { _users } = get();
-      if (_users.find(u => u.email === email)) return { error: 'Email já cadastrado' };
       const hashed = await hashPassword(password);
-      const isFirstUser = _users.length === 0;
-      const user = { id: nanoid(), name, email, password: hashed, role: isFirstUser ? 'admin' : 'user', createdAt: new Date().toISOString() };
-      const newUsers = [..._users, user];
-      set({ _users: newUsers, user: { id: user.id, name, email, role: user.role, createdAt: user.createdAt }, isAuthenticated: true });
-      localStorage.setItem(USERS_KEY, JSON.stringify(newUsers));
-      _save();
-      return { success: true };
+      try {
+        const res = await apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password: hashed }) });
+        const user = { id: res.id, name: res.name, email: res.email, role: res.role, createdAt: res.createdAt };
+        const { _users } = get();
+        const newUsers = [..._users, { ...user, password: hashed }];
+        set({ _users: newUsers, user, isAuthenticated: true });
+        localStorage.setItem(USERS_KEY, JSON.stringify(newUsers));
+        _save();
+        return { success: true };
+      } catch (err) {
+        return { error: err.message || 'Erro ao registrar' };
+      }
     },
 
     login: async ({ email, password }) => {
-      const { _users } = get();
       const hashed = await hashPassword(password);
-      const user = _users.find(u => u.email === email && u.password === hashed);
-      if (!user) return { error: 'Email ou senha incorretos' };
-      // Ensure existing users have a role
-      const role = user.role || (_users.indexOf(user) === 0 ? 'admin' : 'user');
-      set({ user: { id: user.id, name: user.name, email: user.email, role, createdAt: user.createdAt }, isAuthenticated: true });
-      _save();
-      window.location.reload();
-      return { success: true };
+      try {
+        const res = await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, password: hashed }) });
+        const user = { id: res.id, name: res.name, email: res.email, role: res.role, createdAt: res.createdAt };
+        set({ user, isAuthenticated: true });
+        _save();
+        window.location.reload();
+        return { success: true };
+      } catch (err) {
+        return { error: err.message || 'Email ou senha incorretos' };
+      }
     },
 
     logout: () => {
