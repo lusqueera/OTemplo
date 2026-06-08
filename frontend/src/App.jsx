@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Target, Repeat, Timer, Brain, Wallet, BookOpen, BarChart3, Settings, Plus, X, ListTodo, StickyNote, DollarSign, Crosshair, Zap, LogOut, User, Dumbbell, CalendarDays, Landmark, Sparkles, FileText, ShieldCheck } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import { useAuthStore, useConfigStore } from 'src/store/stores';
+import { useAuthStore, useConfigStore, useHabitStore, useFocusStore, useFinanceStore, useInvestmentStore, useNotesStore, useReviewStore, useWorkoutStore, usePriorityStore } from 'src/store/stores';
+import { syncAllFromBackend } from 'src/store/sync';
 import ToastContainer from 'src/components/ui/ToastContainer';
 import { LoginPage, RegisterPage } from 'src/modules/auth/AuthPages';
 import Dashboard from 'src/modules/dashboard/Dashboard';
@@ -104,6 +105,20 @@ function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const closeSidebar = () => setSidebarOpen(false);
+
+  // Sincroniza dados do backend ao montar
+  useEffect(() => {
+    syncAllFromBackend({
+      habits: useHabitStore,
+      focus: useFocusStore,
+      finance: useFinanceStore,
+      investments: useInvestmentStore,
+      notes: useNotesStore,
+      reviews: useReviewStore,
+      workouts: useWorkoutStore,
+      priority: usePriorityStore,
+    });
+  }, []);
 
   const systemItems = [...navItems.filter(n => n.section === 'system')];
   if (user?.role === 'admin') {

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
+import { apiCreate, apiUpdate, apiDelete } from './sync';
 
 const persist = (key, fn) => (set, get) => {
   const stored = localStorage.getItem(key);
@@ -47,17 +48,17 @@ export const usePriorityStore = create((set, get) => {
 
   return {
     ...init,
-    addObjective: (obj) => { set(s => ({ objectives: [...s.objectives, { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', progress: 0, ...obj }] })); _save(); },
-    updateObjective: (id, data) => { set(s => ({ objectives: s.objectives.map(o => o.id === id ? { ...o, ...data } : o) })); _save(); },
-    deleteObjective: (id) => { set(s => ({ objectives: s.objectives.filter(o => o.id !== id) })); _save(); },
+    addObjective: (obj) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', progress: 0, ...obj }; set(s => ({ objectives: [...s.objectives, item] })); _save(); apiCreate('/objectives', item); },
+    updateObjective: (id, data) => { set(s => ({ objectives: s.objectives.map(o => o.id === id ? { ...o, ...data } : o) })); _save(); apiUpdate('/objectives', { id, ...data }); },
+    deleteObjective: (id) => { set(s => ({ objectives: s.objectives.filter(o => o.id !== id) })); _save(); apiDelete('/objectives', id); },
 
-    addMilestone: (m) => { set(s => ({ milestones: [...s.milestones, { id: nanoid(), createdAt: new Date().toISOString(), status: 'pending', ...m }] })); _save(); },
-    updateMilestone: (id, data) => { set(s => ({ milestones: s.milestones.map(m => m.id === id ? { ...m, ...data } : m) })); _save(); },
-    deleteMilestone: (id) => { set(s => ({ milestones: s.milestones.filter(m => m.id !== id) })); _save(); },
+    addMilestone: (m) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), status: 'pending', ...m }; set(s => ({ milestones: [...s.milestones, item] })); _save(); apiCreate('/milestones', item); },
+    updateMilestone: (id, data) => { set(s => ({ milestones: s.milestones.map(m => m.id === id ? { ...m, ...data } : m) })); _save(); apiUpdate('/milestones', { id, ...data }); },
+    deleteMilestone: (id) => { set(s => ({ milestones: s.milestones.filter(m => m.id !== id) })); _save(); apiDelete('/milestones', id); },
 
-    addTask: (t) => { set(s => ({ tasks: [...s.tasks, { id: nanoid(), createdAt: new Date().toISOString(), status: 'pending', ...t }] })); _save(); },
-    updateTask: (id, data) => { set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...data } : t) })); _save(); },
-    deleteTask: (id) => { set(s => ({ tasks: s.tasks.filter(t => t.id !== id) })); _save(); },
+    addTask: (t) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), status: 'pending', ...t }; set(s => ({ tasks: [...s.tasks, item] })); _save(); apiCreate('/tasks', item); },
+    updateTask: (id, data) => { set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...data } : t) })); _save(); apiUpdate('/tasks', { id, ...data }); },
+    deleteTask: (id) => { set(s => ({ tasks: s.tasks.filter(t => t.id !== id) })); _save(); apiDelete('/tasks', id); },
   };
 });
 
@@ -75,9 +76,9 @@ export const useHabitStore = create((set, get) => {
 
   return {
     ...init,
-    addHabit: (h) => { set(s => ({ habits: [...s.habits, { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', streak: 0, ...h }] })); _save(); },
-    updateHabit: (id, data) => { set(s => ({ habits: s.habits.map(h => h.id === id ? { ...h, ...data } : h) })); _save(); },
-    deleteHabit: (id) => { set(s => ({ habits: s.habits.filter(h => h.id !== id) })); _save(); },
+    addHabit: (h) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', streak: 0, ...h }; set(s => ({ habits: [...s.habits, item] })); _save(); apiCreate('/habits', item); },
+    updateHabit: (id, data) => { set(s => ({ habits: s.habits.map(h => h.id === id ? { ...h, ...data } : h) })); _save(); apiUpdate('/habits', { id, ...data }); },
+    deleteHabit: (id) => { set(s => ({ habits: s.habits.filter(h => h.id !== id) })); _save(); apiDelete('/habits', id); },
     logHabit: (habitId, status, date) => {
       const logDate = date || new Date().toISOString().split('T')[0];
       set(s => {
@@ -119,6 +120,7 @@ export const useFocusStore = create((set, get) => {
       const completed = { ...activeSession, ...result, endTime: new Date().toISOString(), status: 'completed' };
       set(s => ({ sessions: [...s.sessions, completed], activeSession: null }));
       _save();
+      apiCreate('/focus', completed);
     },
     cancelSession: () => { set({ activeSession: null }); _save(); },
   };
@@ -168,10 +170,10 @@ export const useFinanceStore = create((set, get) => {
 
   return {
     ...init,
-    addTransaction: (t) => { set(s => ({ transactions: [...s.transactions, { id: nanoid(), createdAt: new Date().toISOString(), ...t }] })); _save(); },
-    updateTransaction: (id, data) => { set(s => ({ transactions: s.transactions.map(t => t.id === id ? { ...t, ...data } : t) })); _save(); },
-    deleteTransaction: (id) => { set(s => ({ transactions: s.transactions.filter(t => t.id !== id) })); _save(); },
-    importTransactions: (items) => { set(s => ({ transactions: [...s.transactions, ...items.map(t => ({ id: nanoid(), createdAt: new Date().toISOString(), ...t }))] })); _save(); },
+    addTransaction: (t) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), ...t }; set(s => ({ transactions: [...s.transactions, item] })); _save(); apiCreate('/finances', item); },
+    updateTransaction: (id, data) => { set(s => ({ transactions: s.transactions.map(t => t.id === id ? { ...t, ...data } : t) })); _save(); apiUpdate('/finances', { id, ...data }); },
+    deleteTransaction: (id) => { set(s => ({ transactions: s.transactions.filter(t => t.id !== id) })); _save(); apiDelete('/finances', id); },
+    importTransactions: (items) => { const newItems = items.map(t => ({ id: nanoid(), createdAt: new Date().toISOString(), ...t })); set(s => ({ transactions: [...s.transactions, ...newItems] })); _save(); newItems.forEach(i => apiCreate('/finances', i)); },
     addCategory: (c) => { set(s => ({ categories: [...s.categories, { id: nanoid(), ...c }] })); _save(); },
     deleteCategory: (id) => { set(s => ({ categories: s.categories.filter(c => c.id !== id) })); _save(); },
     addGoal: (g) => { set(s => ({ goals: [...s.goals, { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', current: 0, ...g }] })); _save(); },
@@ -194,9 +196,9 @@ export const useReviewStore = create((set, get) => {
 
   return {
     ...init,
-    addReview: (r) => { set(s => ({ reviews: [...s.reviews, { id: nanoid(), createdAt: new Date().toISOString(), ...r }] })); _save(); },
-    updateReview: (id, data) => { set(s => ({ reviews: s.reviews.map(r => r.id === id ? { ...r, ...data } : r) })); _save(); },
-    deleteReview: (id) => { set(s => ({ reviews: s.reviews.filter(r => r.id !== id) })); _save(); },
+    addReview: (r) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), ...r }; set(s => ({ reviews: [...s.reviews, item] })); _save(); apiCreate('/reviews', item); },
+    updateReview: (id, data) => { set(s => ({ reviews: s.reviews.map(r => r.id === id ? { ...r, ...data } : r) })); _save(); apiUpdate('/reviews', { id, ...data }); },
+    deleteReview: (id) => { set(s => ({ reviews: s.reviews.filter(r => r.id !== id) })); _save(); apiDelete('/reviews', id); },
   };
 });
 
@@ -278,9 +280,10 @@ export const useWorkoutStore = create((set, get) => {
       const workout = { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', ...w, exercises: w.exercises || [] };
       set(s => ({ workouts: [...s.workouts, workout] }));
       _save();
+      apiCreate('/workouts', workout);
     },
-    updateWorkout: (id, data) => { set(s => ({ workouts: s.workouts.map(w => w.id === id ? { ...w, ...data } : w) })); _save(); },
-    deleteWorkout: (id) => { set(s => ({ workouts: s.workouts.filter(w => w.id !== id) })); _save(); },
+    updateWorkout: (id, data) => { set(s => ({ workouts: s.workouts.map(w => w.id === id ? { ...w, ...data } : w) })); _save(); apiUpdate('/workouts', { id, ...data }); },
+    deleteWorkout: (id) => { set(s => ({ workouts: s.workouts.filter(w => w.id !== id) })); _save(); apiDelete('/workouts', id); },
 
     logWorkout: (log) => {
       const entry = { id: nanoid(), date: new Date().toISOString(), ...log };
@@ -325,10 +328,10 @@ export const useInvestmentStore = create((set, get) => {
 
   return {
     ...init,
-    addInvestment: (i) => { set(s => ({ investments: [...s.investments, { id: nanoid(), createdAt: new Date().toISOString(), ...i }] })); _save(); },
-    updateInvestment: (id, data) => { set(s => ({ investments: s.investments.map(i => i.id === id ? { ...i, ...data } : i) })); _save(); },
-    deleteInvestment: (id) => { set(s => ({ investments: s.investments.filter(i => i.id !== id) })); _save(); },
-    importInvestments: (items) => { set(s => ({ investments: [...s.investments, ...items.map(i => ({ id: nanoid(), createdAt: new Date().toISOString(), ...i }))] })); _save(); },
+    addInvestment: (i) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), ...i }; set(s => ({ investments: [...s.investments, item] })); _save(); apiCreate('/investments', item); },
+    updateInvestment: (id, data) => { set(s => ({ investments: s.investments.map(i => i.id === id ? { ...i, ...data } : i) })); _save(); apiUpdate('/investments', { id, ...data }); },
+    deleteInvestment: (id) => { set(s => ({ investments: s.investments.filter(i => i.id !== id) })); _save(); apiDelete('/investments', id); },
+    importInvestments: (items) => { const newItems = items.map(i => ({ id: nanoid(), createdAt: new Date().toISOString(), ...i })); set(s => ({ investments: [...s.investments, ...newItems] })); _save(); newItems.forEach(i => apiCreate('/investments', i)); },
   };
 });
 
@@ -351,14 +354,16 @@ export const useNotesStore = create((set, get) => {
     ...init,
     addNote: (n) => {
       const now = new Date().toISOString();
-      set(s => ({ notes: [{ id: nanoid(), createdAt: now, updatedAt: now, favorite: false, category: '', ...n }, ...s.notes] }));
+      const item = { id: nanoid(), createdAt: now, updatedAt: now, favorite: false, category: '', ...n };
+      set(s => ({ notes: [item, ...s.notes] }));
       _save();
+      apiCreate('/notes', { title: item.title || '', content: item.content || '', type: item.type || 'note', category: item.category || null, isPinned: item.favorite || false });
     },
     updateNote: (id, data) => {
       set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, ...data, updatedAt: new Date().toISOString() } : n) }));
       _save();
     },
-    deleteNote: (id) => { set(s => ({ notes: s.notes.filter(n => n.id !== id) })); _save(); },
+    deleteNote: (id) => { set(s => ({ notes: s.notes.filter(n => n.id !== id) })); _save(); apiDelete('/notes', id); },
     toggleFavorite: (id) => {
       set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, favorite: !n.favorite, updatedAt: new Date().toISOString() } : n) }));
       _save();
