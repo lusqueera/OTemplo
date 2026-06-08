@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  objectives   Objective[]
+  milestones   Milestone[]
+  tasks        Task[]
+  habits       Habit[]
+  habitLogs    HabitLog[]
+  sessions     Session[]
+  transactions Transaction[]
+  workouts     Workout[]
+  reviews      Review[]
+  notes        Note[]
+  investments  Investment[]
+}
+
+model Objective {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  status      String   @default("active")
+  progress    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestones Milestone[]
+}
+
+model Milestone {
+  id          String   @id @default(uuid())
+  name        String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  objectiveId String?
+  objective   Objective? @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  tasks       Task[]
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  name        String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestoneId String?
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+}
+
+model Habit {
+  id        String   @id @default(uuid())
+  name      String
+  frequency String   @default("daily")
+  time      String?
+  status    String   @default("active")
+  streak    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs      HabitLog[]
+}
+
+model HabitLog {
+  id        String   @id @default(uuid())
+  date      String
+  status    String   @default("done")
+  notes     String?
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId   String
+  habit     Habit   @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, date])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  startTime String
+  endTime   String?
+  type      String   @default("deep")
+  status    String   @default("completed")
+  quality   Int?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  type        String   @default("expense")
+  amount      Float
+  category    String?
+  description String?
+  date        String
+  recurrence  String   @default("none")
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Investment {
+  id            String   @id @default(uuid())
+  name          String
+  type          String   @default("stock")
+  amount        Float
+  status        String   @default("active")
+  profitability Float?
+  date          String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Workout {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  type        String   @default("hypertrophy")
+  date        String?
+  startTime   String?
+  endTime     String?
+  perception  String?
+  notes       String?
+  duration    Int?
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises   WorkoutExercise[]
+}
+
+model WorkoutExercise {
+  id               String   @id @default(uuid())
+  exerciseId       String?
+  name             String
+  muscle           String?
+  bodyPart         String?
+  sets             Int
+  reps             String
+  weight           Float    @default(0)
+  rest             Int      @default(60)
+  targetMuscles    String[]
+  secondaryMuscles String[]
+  equipments       String[]
+  bodyParts        String[]
+  instructions     String[]
+  gifUrl           String?
+  
+  workoutId        String
+  workout          Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id           String   @id @default(uuid())
+  type         String   @default("daily")
+  date         String
+  energy       Int?
+  focus        Int?
+  mood         Int?
+  notes        String?
+  wins         String[]
+  improvements String[]
+  createdAt    DateTime @default(now())
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  type      String   @default("note")
+  category  String?
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
