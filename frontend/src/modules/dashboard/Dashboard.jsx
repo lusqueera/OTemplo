@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useConfigStore, usePriorityStore, useHabitStore, useAgendaStore, useFocusStore, useFinanceStore, useInvestmentStore } from 'src/store/stores';
+import { useConfigStore, usePriorityStore, useHabitStore, useAgendaStore, useFocusStore, useFinanceStore, useInvestmentStore, useWorkoutStore } from 'src/store/stores';
 import { ArrowRight, CheckCircle2, Clock, Flame, Sparkles, Plus, X, ChevronRight, Play, Target, Repeat, CalendarDays, SmilePlus, ListChecks, Trophy } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -112,56 +112,76 @@ function NextAction() {
 }
 
 function LifeScore() {
-  const { habits, logs } = useHabitStore();
+  const { habits, logs: habitLogs } = useHabitStore();
   const { tasks } = usePriorityStore();
   const { sessions } = useFocusStore();
   const { transactions } = useFinanceStore();
   const { mood } = useConfigStore();
+  const { logs: workoutLogs } = useWorkoutStore();
 
   const scores = useMemo(() => {
     const today = new Date();
     const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
     const weekAgoStr = weekAgo.toISOString().split('T')[0];
+    const monthStr = today.toISOString().split('T')[0].slice(0, 7);
 
-    // Saúde: Hábitos concluídos na última semana vs ativos
+    // 1. SAÚDE: Hábitos + Treinos na última semana
     const activeHabits = habits.filter(h => h.status === 'active');
-    let health = 50;
+    let maxHealth = 3; // Meta base: 3 treinos por semana
+    let earnedHealth = Math.min(3, workoutLogs.filter(l => l.date >= weekAgoStr).length);
+    
     if (activeHabits.length > 0) {
-      const weekLogs = logs.filter(l => l.date >= weekAgoStr && l.status === 'done');
-      health = Math.min(100, Math.round((weekLogs.length / (activeHabits.length * 7)) * 100));
+      maxHealth += activeHabits.length * 7;
+      earnedHealth += habitLogs.filter(l => l.date >= weekAgoStr && l.status === 'done').length;
     }
+    const health = Math.round((earnedHealth / maxHealth) * 100);
 
-    // Trabalho/Produtividade: Tarefas concluídas
+    // 2. TRABALHO: Tarefas concluídas
     let work = 50;
-    if (tasks.length > 0) {
-      const doneTasks = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
-      work = Math.min(100, Math.round((doneTasks / tasks.length) * 100));
+    const recentTasks = tasks.filter(t => t.createdAt >= weekAgoStr || t.status === 'completed' || t.status === 'done');
+    const taskSet = recentTasks.length > 0 ? recentTasks : tasks;
+    if (taskSet.length > 0) {
+      const doneTasks = taskSet.filter(t => t.status === 'completed' || t.status === 'done').length;
+      work = Math.min(100, Math.max(10, Math.round((doneTasks / taskSet.length) * 100)));
     }
 
-    // Foco / Estudo: Minutos de sessão
+    // 3. FOCO: Tempo de sessões (Trabalho/Deep)
     const weekSessions = sessions.filter(s => s.startTime >= weekAgoStr);
-    let focusScore = 50;
-    if (weekSessions.length > 0) {
-      const totalMin = weekSessions.reduce((a, s) => a + (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 60000 : 0), 0);
-      focusScore = Math.min(100, Math.round((totalMin / 600) * 100)); // 10h/semana = 100
+    const workSessions = weekSessions.filter(s => s.type !== 'study' && s.type !== 'reading');
+    let focusScore = 30; // base inicial
+    if (workSessions.length > 0) {
+      const totalMin = workSessions.reduce((a, s) => a + (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 60000 : 0), 0);
+      focusScore = Math.min(100, Math.max(30, Math.round((totalMin / 600) * 100))); // Meta: 10h/semana
     }
-    const studyScore = focusScore; // Podemos atrelar estudo ao tempo de foco profundo.
 
-    // Finanças: Lucratividade baseada em Receita x Despesa
-    const weekTrans = transactions.filter(t => t.date >= weekAgoStr);
+    // 4. ESTUDO: Sessões de estudo/leitura
+    const studySessions = weekSessions.filter(s => s.type === 'study' || s.type === 'reading');
+    let studyScore = 20; 
+    if (studySessions.length > 0) {
+      const totalMin = studySessions.reduce((a, s) => a + (s.endTime ? (new Date(s.endTime) - new Date(s.startTime)) / 60000 : 0), 0);
+      studyScore = Math.min(100, Math.max(20, Math.round((totalMin / 240) * 100))); // Meta: 4h/semana
+    }
+
+    // 5. FINANÇAS: Saúde financeira do Mês Atual (Receitas vs Despesas)
+    const monthTrans = transactions.filter(t => t.date?.startsWith(monthStr));
     let finance = 50;
-    if (weekTrans.length > 0) {
-      const inc = weekTrans.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0);
-      const exp = weekTrans.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
+    if (monthTrans.length > 0) {
+      const inc = monthTrans.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0);
+      const exp = monthTrans.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
       if (inc > 0) {
-        finance = Math.min(100, Math.max(0, Math.round(((inc - exp) / inc) * 100) + 50));
+        const ratio = exp / inc;
+        // Gasta 0% = 100 pts. Gasta 50% = 75 pts. Gasta 100% = 50 pts. Gasta >100% cai rápido.
+        if (ratio <= 1) finance = Math.round(100 - (ratio * 50));
+        else finance = Math.max(10, Math.round(50 - ((ratio - 1) * 100)));
+      } else if (exp > 0) {
+        finance = 20; // Apenas gastos sem receita no mês
       }
     }
 
-    // Energia/Mood
+    // 6. ENERGIA: Mood tracker diário
     let energy = 50;
     if (mood) {
-      energy = { peak: 100, good: 80, neutral: 60, low: 30, frustrated: 20 }[mood] || 50;
+      energy = { peak: 100, good: 85, neutral: 60, low: 30, frustrated: 15 }[mood] || 50;
     }
 
     return [
@@ -172,7 +192,7 @@ function LifeScore() {
       { label: 'Foco', value: focusScore || 0, color: 'var(--purple)' },
       { label: 'Energia', value: energy || 0, color: '#f472b6' },
     ];
-  }, [habits, logs, tasks, sessions, transactions, mood]);
+  }, [habits, habitLogs, tasks, sessions, transactions, mood, workoutLogs]);
   const avg = Math.round(scores.reduce((a, s) => a + s.value, 0) / scores.length);
   return (
     <div className="card animate-in">
@@ -211,26 +231,53 @@ function HabitSnapshot() {
 }
 
 function TimelineWidget() {
-  const events = [
-    { time: '08:00', title: 'Morning routine', type: 'habit' },
-    { time: '09:30', title: 'Deep work — Projeto X', type: 'focus' },
-    { time: '12:00', title: 'Almoço', type: 'break' },
-    { time: '14:00', title: 'Revisão semanal', type: 'review' },
-    { time: '16:00', title: 'Estudo — React avançado', type: 'study' },
-  ];
+  const { appointments } = useAgendaStore();
+  const { habits } = useHabitStore();
+  const { workouts } = useWorkoutStore();
+
+  const events = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const list = [];
+
+    // Agenda
+    appointments.filter(a => a.date === todayStr).forEach(a => {
+      list.push({ time: a.time || '00:00', title: a.title, type: 'agenda' });
+    });
+
+    // Hábitos com horário definido
+    habits.filter(h => h.status === 'active' && h.time).forEach(h => {
+      list.push({ time: h.time, title: h.name, type: 'hábito' });
+    });
+
+    // Treinos agendados
+    workouts.filter(w => w.date === todayStr && w.startTime).forEach(w => {
+      list.push({ time: w.startTime, title: w.name, type: 'treino' });
+    });
+
+    return list.sort((a, b) => a.time.localeCompare(b.time));
+  }, [appointments, habits, workouts]);
+
   return (
-    <div className="card animate-in">
-      <div className="card-header"><span className="card-title">Timeline</span><Clock size={14} color="var(--text-muted)" /></div>
-      {events.map((e, i) => (
-        <div key={i} className="timeline-item">
-          <span className="timeline-time">{e.time}</span>
-          <div className="timeline-dot" />
-          <div className="timeline-content">
-            <p style={{ fontSize: 13, fontWeight: 500 }}>{e.title}</p>
-            <span className="badge badge-muted" style={{ marginTop: 4 }}>{e.type}</span>
+    <div className="card animate-in" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="card-header"><span className="card-title">Timeline de Hoje</span><Clock size={14} color="var(--text-muted)" /></div>
+      <div style={{ flex: 1, overflowY: 'auto', paddingRight: 4, maxHeight: 260 }}>
+        {events.length === 0 ? (
+          <div className="empty-state" style={{ padding: '24px 0', border: 'none' }}>
+            <p>Sua timeline está vazia hoje</p>
           </div>
-        </div>
-      ))}
+        ) : (
+          events.map((e, i) => (
+            <div key={i} className="timeline-item">
+              <span className="timeline-time">{e.time}</span>
+              <div className="timeline-dot" />
+              <div className="timeline-content">
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{e.title}</p>
+                <span className="badge badge-muted" style={{ marginTop: 4 }}>{e.type}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

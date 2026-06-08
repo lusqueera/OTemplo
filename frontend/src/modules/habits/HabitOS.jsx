@@ -4,7 +4,7 @@ import { Repeat, Plus, X, Flame, Edit2, Trash2, CheckCircle2, Circle, Minus, Tre
 
 function HabitDrawer({ open, onClose, editHabit }) {
   const { addHabit, updateHabit } = useHabitStore();
-  const [form, setForm] = useState(editHabit || { name: '', description: '', frequency: 'daily', idealTime: 'morning', duration: 15, energyLevel: 'medium', category: 'saude', difficulty: 'medium' });
+  const [form, setForm] = useState(editHabit || { name: '', description: '', frequency: 'daily', time: '', duration: 15, energyLevel: 'medium', category: 'saude', difficulty: 'medium' });
 
   const handleSave = () => {
     if (!form.name.trim()) return;
@@ -27,10 +27,8 @@ function HabitDrawer({ open, onClose, editHabit }) {
                 <option value="daily">Diário</option><option value="weekdays">Dias úteis</option><option value="3x">3x/semana</option><option value="weekly">Semanal</option>
               </select>
             </div>
-            <div className="input-group"><label className="input-label">Horário Ideal</label>
-              <select className="select-input" value={form.idealTime} onChange={e => setForm({ ...form, idealTime: e.target.value })}>
-                <option value="morning">Manhã</option><option value="afternoon">Tarde</option><option value="evening">Noite</option><option value="anytime">Qualquer</option>
-              </select>
+            <div className="input-group"><label className="input-label">Horário Específico</label>
+              <input className="input" type="time" value={form.time || ''} onChange={e => setForm({ ...form, time: e.target.value })} title="Opcional. Se preenchido, aparecerá na Timeline." />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
