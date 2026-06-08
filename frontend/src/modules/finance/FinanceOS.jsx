@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFinanceStore } from 'src/store/stores';
-import { Wallet, Plus, X, Edit2, Trash2, TrendingUp, TrendingDown, DollarSign, ArrowUpRight, ArrowDownRight, Upload } from 'lucide-react';
+import { Wallet, Plus, X, Edit2, Trash2, TrendingUp, TrendingDown, DollarSign, ArrowUpRight, ArrowDownRight, Upload, Tags } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import CsvImportModal from 'src/components/CsvImportModal';
 
@@ -17,6 +17,12 @@ const FINANCE_CSV_FIELDS = [
 function TransactionDrawer({ open, onClose, editTx }) {
   const { addTransaction, updateTransaction, categories } = useFinanceStore();
   const [form, setForm] = useState(editTx || { type: 'expense', amount: '', category: '', description: '', date: new Date().toISOString().split('T')[0], recurrence: 'none', tags: '' });
+
+  useEffect(() => {
+    if (open) {
+      setForm(editTx || { type: 'expense', amount: '', category: '', description: '', date: new Date().toISOString().split('T')[0], recurrence: 'none', tags: '' });
+    }
+  }, [editTx, open]);
 
   const handleSave = () => {
     if (!form.amount) return;
@@ -59,11 +65,58 @@ function TransactionDrawer({ open, onClose, editTx }) {
   );
 }
 
+function CategoryModal({ open, onClose }) {
+  const { categories, addCategory, deleteCategory } = useFinanceStore();
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatColor, setNewCatColor] = useState('#60a5fa');
+
+  const handleAdd = () => {
+    if (!newCatName.trim()) return;
+    addCategory({ name: newCatName.trim(), color: newCatColor, monthlyLimit: 0 });
+    setNewCatName('');
+  };
+
+  if (!open) return null;
+  return (
+    <div className="overlay" style={{ zIndex: 400 }}>
+      <div className="drawer-overlay" onClick={onClose} style={{ position: 'absolute', inset: 0 }} />
+      <div className="modal animate-in" style={{ maxWidth: 400, zIndex: 401 }}>
+        <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Categorias de Finanças</span>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
+        </div>
+        
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <input className="input" value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nome da categoria..." style={{ flex: 1 }} />
+          <input type="color" value={newCatColor} onChange={e => setNewCatColor(e.target.value)} style={{ width: 36, height: 36, padding: 0, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', cursor: 'pointer', flexShrink: 0 }} title="Cor" />
+          <button className="btn btn-primary" onClick={handleAdd}><Plus size={16} /></button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
+          {categories.map(c => (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-deep)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: c.color }} />
+                <span style={{ fontSize: 13 }}>{c.name}</span>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => deleteCategory(c.id)} title="Excluir categoria">
+                <Trash2 size={14} style={{ color: 'var(--red)' }} />
+              </button>
+            </div>
+          ))}
+          {categories.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>Nenhuma categoria cadastrada</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FinanceOS() {
   const { transactions, categories, deleteTransaction, importTransactions } = useFinanceStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editTx, setEditTx] = useState(null);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [catOpen, setCatOpen] = useState(false);
 
   const income = transactions.filter(t => t.type === 'income').reduce((a, t) => a + (t.amount || 0), 0);
   const expense = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + (t.amount || 0), 0);
@@ -125,6 +178,9 @@ export default function FinanceOS() {
           <p className="page-subtitle">Controle financeiro operacional</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setCatOpen(true)}>
+            <Tags size={14} /> Categorias
+          </button>
           <button className="btn btn-secondary btn-sm" onClick={() => setCsvOpen(true)}>
             <Upload size={14} /> Importar CSV
           </button>
@@ -225,6 +281,8 @@ export default function FinanceOS() {
         title="Importar Transações"
         helpText="O CSV deve conter colunas como tipo (receita/despesa), valor, categoria, descrição e data. Separe por vírgulas ou ponto-e-vírgula."
       />
+
+      <CategoryModal open={catOpen} onClose={() => setCatOpen(false)} />
     </div>
   );
 }
