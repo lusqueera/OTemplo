@@ -20,6 +20,9 @@ export async function syncAllFromBackend(stores) {
     { name: 'reviews', fn: () => syncReviewsFromBackend(stores.reviews) },
     { name: 'workouts', fn: () => syncWorkoutsFromBackend(stores.workouts) },
     { name: 'priority', fn: () => syncPriorityFromBackend(stores.priority) },
+    { name: 'agenda', fn: () => syncAgendaFromBackend(stores.agenda) },
+    { name: 'brain', fn: () => syncBrainFromBackend(stores.brain) },
+    { name: 'config', fn: () => syncConfigFromBackend(stores.config) },
   ];
 
   for (const task of syncTasks) {
@@ -100,6 +103,48 @@ async function syncPriorityFromBackend(store) {
   if (Object.keys(update).length > 0) store.setState(update);
 }
 
+async function syncAgendaFromBackend(store) {
+  const data = await apiFetch('/agenda');
+  if (Array.isArray(data) && data.length > 0) {
+    store.setState({ appointments: data });
+  }
+}
+
+async function syncBrainFromBackend(store) {
+  // Brain notes are stored as type='brain' in the notes table
+  const data = await apiFetch('/notes');
+  if (Array.isArray(data)) {
+    const brainNotes = data.filter(n => n.type === 'brain');
+    if (brainNotes.length > 0) {
+      store.setState({ notes: brainNotes });
+    }
+  }
+}
+
+async function syncConfigFromBackend(store) {
+  const data = await apiFetch('/config');
+  if (data && typeof data === 'object') {
+    const update = {};
+    if (data.profileName || data.archetype || data.intensity) {
+      update.profile = {
+        name: data.profileName || 'Operador',
+        archetype: data.archetype || 'Estrategista',
+        intensity: data.intensity || 'high',
+      };
+    }
+    if (data.focusPhrase) update.focusPhrase = data.focusPhrase;
+    if (data.focusDuration || data.notifications !== undefined || data.theme) {
+      update.preferences = {
+        focusDuration: data.focusDuration || 25,
+        notifications: data.notifications ?? true,
+        theme: data.theme || 'dark',
+      };
+    }
+    if (data.mood) update.mood = data.mood;
+    if (Array.isArray(data.moodHistory) && data.moodHistory.length > 0) update.moodHistory = data.moodHistory;
+    if (Object.keys(update).length > 0) store.setState(update);
+  }
+}
 
 // ==================== SYNC: PERSIST (Stores → Backend) ====================
 // Funções que as stores chamam após cada mutação para persistir no Postgres.

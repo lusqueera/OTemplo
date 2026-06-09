@@ -82,17 +82,20 @@ export const useHabitStore = create((set, get) => {
     deleteHabit: (id) => { set(s => ({ habits: s.habits.filter(h => h.id !== id) })); _save(); apiDelete('/habits', id); },
     logHabit: (habitId, status, date) => {
       const logDate = date || new Date().toISOString().split('T')[0];
-      set(s => {
-        const existing = s.logs.findIndex(l => l.habitId === habitId && l.date === logDate);
-        let newLogs;
-        if (existing >= 0) {
-          newLogs = [...s.logs]; newLogs[existing] = { ...newLogs[existing], status };
-        } else {
-          newLogs = [...s.logs, { id: nanoid(), habitId, date: logDate, status }];
-        }
-        return { logs: newLogs };
-      });
-      _save();
+      const { logs } = get();
+      const existing = logs.findIndex(l => l.habitId === habitId && l.date === logDate);
+      if (existing >= 0) {
+        const updated = { ...logs[existing], status };
+        const newLogs = [...logs]; newLogs[existing] = updated;
+        set({ logs: newLogs });
+        _save();
+        apiUpdate('/habits/logs', { id: updated.id, habitId, date: logDate, status });
+      } else {
+        const newLog = { id: nanoid(), habitId, date: logDate, status };
+        set(s => ({ logs: [...s.logs, newLog] }));
+        _save();
+        apiCreate('/habits/logs', newLog);
+      }
     },
   };
 });
@@ -123,13 +126,15 @@ export const useFocusStore = create((set, get) => {
       _save();
       apiCreate('/focus', completed);
     },
+    updateSession: (id, data) => { set(s => ({ sessions: s.sessions.map(sess => sess.id === id ? { ...sess, ...data } : sess) })); _save(); apiUpdate('/focus', { id, ...data }); },
+    deleteSession: (id) => { set(s => ({ sessions: s.sessions.filter(sess => sess.id !== id) })); _save(); apiDelete('/focus', id); },
     cancelSession: () => { set({ activeSession: null }); _save(); },
   };
 });
 
 // ==================== BRAIN STORE ====================
 export const useBrainStore = create((set, get) => {
-  const KEY = 'coreos_brain';
+  const KEY = getStoreKey('coreos_brain');
   const stored = localStorage.getItem(KEY);
   let init = { notes: [] };
   if (stored) try { init = { ...init, ...JSON.parse(stored) }; } catch {}
@@ -141,10 +146,10 @@ export const useBrainStore = create((set, get) => {
 
   return {
     ...init,
-    addNote: (n) => { set(s => ({ notes: [...s.notes, { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', ...n }] })); _save(); },
-    updateNote: (id, data) => { set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, ...data } : n) })); _save(); },
-    deleteNote: (id) => { set(s => ({ notes: s.notes.filter(n => n.id !== id) })); _save(); },
-    archiveNote: (id) => { set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, status: 'archived' } : n) })); _save(); },
+    addNote: (n) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', ...n }; set(s => ({ notes: [...s.notes, item] })); _save(); apiCreate('/notes', { title: item.title || item.name || '', content: item.content || '', type: 'brain', category: item.category || null, isPinned: false }); },
+    updateNote: (id, data) => { set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, ...data } : n) })); _save(); apiUpdate('/notes', { id, ...data }); },
+    deleteNote: (id) => { set(s => ({ notes: s.notes.filter(n => n.id !== id) })); _save(); apiDelete('/notes', id); },
+    archiveNote: (id) => { set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, status: 'archived' } : n) })); _save(); apiUpdate('/notes', { id, status: 'archived' }); },
   };
 });
 
@@ -175,11 +180,11 @@ export const useFinanceStore = create((set, get) => {
     updateTransaction: (id, data) => { set(s => ({ transactions: s.transactions.map(t => t.id === id ? { ...t, ...data } : t) })); _save(); apiUpdate('/finances', { id, ...data }); },
     deleteTransaction: (id) => { set(s => ({ transactions: s.transactions.filter(t => t.id !== id) })); _save(); apiDelete('/finances', id); },
     importTransactions: (items) => { const newItems = items.map(t => ({ id: nanoid(), createdAt: new Date().toISOString(), ...t })); set(s => ({ transactions: [...s.transactions, ...newItems] })); _save(); newItems.forEach(i => apiCreate('/finances', i)); },
-    addCategory: (c) => { set(s => ({ categories: [...s.categories, { id: nanoid(), ...c }] })); _save(); },
-    deleteCategory: (id) => { set(s => ({ categories: s.categories.filter(c => c.id !== id) })); _save(); },
-    addGoal: (g) => { set(s => ({ goals: [...s.goals, { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', current: 0, ...g }] })); _save(); },
-    updateGoal: (id, data) => { set(s => ({ goals: s.goals.map(g => g.id === id ? { ...g, ...data } : g) })); _save(); },
-    deleteGoal: (id) => { set(s => ({ goals: s.goals.filter(g => g.id !== id) })); _save(); },
+    addCategory: (c) => { const item = { id: nanoid(), ...c }; set(s => ({ categories: [...s.categories, item] })); _save(); apiCreate('/finances/categories', item); },
+    deleteCategory: (id) => { set(s => ({ categories: s.categories.filter(c => c.id !== id) })); _save(); apiDelete('/finances/categories', id); },
+    addGoal: (g) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), status: 'active', current: 0, ...g }; set(s => ({ goals: [...s.goals, item] })); _save(); apiCreate('/finances/goals', item); },
+    updateGoal: (id, data) => { set(s => ({ goals: s.goals.map(g => g.id === id ? { ...g, ...data } : g) })); _save(); apiUpdate('/finances/goals', { id, ...data }); },
+    deleteGoal: (id) => { set(s => ({ goals: s.goals.filter(g => g.id !== id) })); _save(); apiDelete('/finances/goals', id); },
   };
 });
 
@@ -226,15 +231,16 @@ export const useConfigStore = create((set, get) => {
 
   return {
     ...init,
-    updateProfile: (data) => { set(s => ({ profile: { ...s.profile, ...data } })); _save(); },
+    updateProfile: (data) => { set(s => ({ profile: { ...s.profile, ...data } })); _save(); apiFetch('/config', { method: 'PUT', body: JSON.stringify({ profileName: data.name || get().profile.name, archetype: data.archetype || get().profile.archetype, intensity: data.intensity || get().profile.intensity }) }).catch(() => {}); },
     setProfileImage: (img) => { set({ profileImage: img }); _save(); },
-    updatePreferences: (data) => { set(s => ({ preferences: { ...s.preferences, ...data } })); _save(); },
+    updatePreferences: (data) => { set(s => ({ preferences: { ...s.preferences, ...data } })); _save(); apiFetch('/config', { method: 'PUT', body: JSON.stringify({ focusDuration: data.focusDuration ?? get().preferences.focusDuration, notifications: data.notifications ?? get().preferences.notifications, theme: data.theme ?? get().preferences.theme }) }).catch(() => {}); },
     setMood: (mood) => {
       const entry = { mood, date: new Date().toISOString().split('T')[0], time: new Date().toISOString() };
       set(s => ({ mood, moodHistory: [...s.moodHistory, entry] }));
       _save();
+      apiFetch('/config', { method: 'PUT', body: JSON.stringify({ mood, moodHistory: get().moodHistory }) }).catch(() => {});
     },
-    setFocusPhrase: (phrase) => { set({ focusPhrase: phrase }); _save(); },
+    setFocusPhrase: (phrase) => { set({ focusPhrase: phrase }); _save(); apiFetch('/config', { method: 'PUT', body: JSON.stringify({ focusPhrase: phrase }) }).catch(() => {}); },
     addDailyPriority: (p) => { set(s => ({ dailyPriorities: [...s.dailyPriorities, { id: nanoid(), done: false, createdAt: new Date().toISOString().split('T')[0], ...p }] })); _save(); },
     updateDailyPriority: (id, data) => { set(s => ({ dailyPriorities: s.dailyPriorities.map(p => p.id === id ? { ...p, ...data } : p) })); _save(); },
     deleteDailyPriority: (id) => { set(s => ({ dailyPriorities: s.dailyPriorities.filter(p => p.id !== id) })); _save(); },
@@ -290,8 +296,9 @@ export const useWorkoutStore = create((set, get) => {
       const entry = { id: nanoid(), date: new Date().toISOString(), ...log };
       set(s => ({ logs: [...s.logs, entry] }));
       _save();
+      apiCreate('/workouts/logs', entry);
     },
-    deleteLog: (id) => { set(s => ({ logs: s.logs.filter(l => l.id !== id) })); _save(); },
+    deleteLog: (id) => { set(s => ({ logs: s.logs.filter(l => l.id !== id) })); _save(); apiDelete('/workouts/logs', id); },
   };
 });
 
@@ -309,9 +316,9 @@ export const useAgendaStore = create((set, get) => {
 
   return {
     ...init,
-    addAppointment: (a) => { set(s => ({ appointments: [...s.appointments, { id: nanoid(), createdAt: new Date().toISOString(), ...a }] })); _save(); },
-    updateAppointment: (id, data) => { set(s => ({ appointments: s.appointments.map(a => a.id === id ? { ...a, ...data } : a) })); _save(); },
-    deleteAppointment: (id) => { set(s => ({ appointments: s.appointments.filter(a => a.id !== id) })); _save(); },
+    addAppointment: (a) => { const item = { id: nanoid(), createdAt: new Date().toISOString(), ...a }; set(s => ({ appointments: [...s.appointments, item] })); _save(); apiCreate('/agenda', item); },
+    updateAppointment: (id, data) => { set(s => ({ appointments: s.appointments.map(a => a.id === id ? { ...a, ...data } : a) })); _save(); apiUpdate('/agenda', { id, ...data }); },
+    deleteAppointment: (id) => { set(s => ({ appointments: s.appointments.filter(a => a.id !== id) })); _save(); apiDelete('/agenda', id); },
   };
 });
 
@@ -363,11 +370,15 @@ export const useNotesStore = create((set, get) => {
     updateNote: (id, data) => {
       set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, ...data, updatedAt: new Date().toISOString() } : n) }));
       _save();
+      apiUpdate('/notes', { id, ...data });
     },
     deleteNote: (id) => { set(s => ({ notes: s.notes.filter(n => n.id !== id) })); _save(); apiDelete('/notes', id); },
     toggleFavorite: (id) => {
-      set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, favorite: !n.favorite, updatedAt: new Date().toISOString() } : n) }));
+      const note = get().notes.find(n => n.id === id);
+      const newFav = !note?.favorite;
+      set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, favorite: newFav, updatedAt: new Date().toISOString() } : n) }));
       _save();
+      apiUpdate('/notes', { id, isPinned: newFav });
     },
     addCategory: (cat) => {
       set(s => ({ categories: s.categories.includes(cat) ? s.categories : [...s.categories, cat] }));
@@ -447,57 +458,74 @@ export const useAuthStore = create((set, get) => {
       window.location.reload();
     },
 
-    updateName: (name) => {
+    updateName: async (name) => {
       const { user, _users } = get();
       if (!user) return;
-      const updatedUsers = _users.map(u => u.id === user.id ? { ...u, name } : u);
-      set({ user: { ...user, name }, _users: updatedUsers });
-      localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
-      _save();
+      try {
+        await apiFetch('/users/me', { method: 'PUT', body: JSON.stringify({ name }) });
+        const updatedUsers = _users.map(u => u.id === user.id ? { ...u, name } : u);
+        set({ user: { ...user, name }, _users: updatedUsers });
+        localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+        _save();
+      } catch (err) {
+        // Fallback: salva localmente
+        const updatedUsers = _users.map(u => u.id === user.id ? { ...u, name } : u);
+        set({ user: { ...user, name }, _users: updatedUsers });
+        localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+        _save();
+      }
     },
 
     updateEmail: async (newEmail, password) => {
       const { user, _users } = get();
       if (!user) return { error: 'Não autenticado' };
-      if (_users.find(u => u.email === newEmail && u.id !== user.id)) return { error: 'Email já em uso' };
       const hashed = await hashPassword(password);
-      const currentUser = _users.find(u => u.id === user.id);
-      if (currentUser.password !== hashed) return { error: 'Senha incorreta' };
-      const updatedUsers = _users.map(u => u.id === user.id ? { ...u, email: newEmail } : u);
-      set({ user: { ...user, email: newEmail }, _users: updatedUsers });
-      localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
-      _save();
-      return { success: true };
+      try {
+        const res = await apiFetch('/users/me', { method: 'PUT', body: JSON.stringify({ email: newEmail, currentPassword: hashed }) });
+        const updatedUsers = _users.map(u => u.id === user.id ? { ...u, email: newEmail } : u);
+        set({ user: { ...user, email: res.email || newEmail }, _users: updatedUsers });
+        localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+        _save();
+        return { success: true };
+      } catch (err) {
+        return { error: err.message || 'Erro ao atualizar email' };
+      }
     },
 
     updatePassword: async (currentPassword, newPassword) => {
       const { user, _users } = get();
       if (!user) return { error: 'Não autenticado' };
       const currentHash = await hashPassword(currentPassword);
-      const currentUser = _users.find(u => u.id === user.id);
-      if (currentUser.password !== currentHash) return { error: 'Senha atual incorreta' };
       const newHash = await hashPassword(newPassword);
-      const updatedUsers = _users.map(u => u.id === user.id ? { ...u, password: newHash } : u);
-      set({ _users: updatedUsers });
-      localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
-      return { success: true };
+      try {
+        await apiFetch('/users/me', { method: 'PUT', body: JSON.stringify({ password: newHash, currentPassword: currentHash }) });
+        const updatedUsers = _users.map(u => u.id === user.id ? { ...u, password: newHash } : u);
+        set({ _users: updatedUsers });
+        localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+        return { success: true };
+      } catch (err) {
+        return { error: err.message || 'Erro ao alterar senha' };
+      }
     },
 
     deleteAccount: async (password) => {
       const { user, _users } = get();
       if (!user) return { error: 'Não autenticado' };
       const hashed = await hashPassword(password);
-      const currentUser = _users.find(u => u.id === user.id);
-      if (currentUser.password !== hashed) return { error: 'Senha incorreta' };
-      const updatedUsers = _users.filter(u => u.id !== user.id);
-      set({ user: null, isAuthenticated: false, _users: updatedUsers });
-      localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
-      _save();
-      // Clear all user data
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('coreos_') && key !== USERS_KEY) localStorage.removeItem(key);
-      });
-      return { success: true };
+      try {
+        await apiFetch(`/users/me?password=${encodeURIComponent(hashed)}`, { method: 'DELETE' });
+        const updatedUsers = _users.filter(u => u.id !== user.id);
+        set({ user: null, isAuthenticated: false, _users: updatedUsers });
+        localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+        _save();
+        // Clear all user data
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('coreos_') && key !== USERS_KEY) localStorage.removeItem(key);
+        });
+        return { success: true };
+      } catch (err) {
+        return { error: err.message || 'Erro ao deletar conta' };
+      }
     },
 
     adminDeleteUser: (userId) => {

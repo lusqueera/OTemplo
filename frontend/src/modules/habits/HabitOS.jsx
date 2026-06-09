@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHabitStore } from 'src/store/stores';
 import { Repeat, Plus, X, Flame, Edit2, Trash2, CheckCircle2, Circle, Minus, TrendingUp } from 'lucide-react';
 
 function HabitDrawer({ open, onClose, editHabit }) {
   const { addHabit, updateHabit } = useHabitStore();
   const [form, setForm] = useState(editHabit || { name: '', description: '', frequency: 'daily', time: '', duration: 15, energyLevel: 'medium', category: 'saude', difficulty: 'medium' });
+
+  useEffect(() => {
+    if (open) {
+      setForm(editHabit || { name: '', description: '', frequency: 'daily', time: '', duration: 15, energyLevel: 'medium', category: 'saude', difficulty: 'medium' });
+    }
+  }, [editHabit, open]);
 
   const handleSave = () => {
     if (!form.name.trim()) return;

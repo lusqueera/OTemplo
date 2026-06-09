@@ -3,7 +3,7 @@ import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-d
 import { LayoutDashboard, Target, Repeat, Timer, Brain, Wallet, BookOpen, BarChart3, Settings, Plus, X, ListTodo, StickyNote, DollarSign, Crosshair, Zap, LogOut, User, Dumbbell, CalendarDays, Landmark, Sparkles, FileText, ShieldCheck } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import { useAuthStore, useConfigStore, useHabitStore, useFocusStore, useFinanceStore, useInvestmentStore, useNotesStore, useReviewStore, useWorkoutStore, usePriorityStore } from 'src/store/stores';
+import { useAuthStore, useConfigStore, useHabitStore, useFocusStore, useFinanceStore, useInvestmentStore, useNotesStore, useReviewStore, useWorkoutStore, usePriorityStore, useBrainStore, useAgendaStore } from 'src/store/stores';
 import { syncAllFromBackend } from 'src/store/sync';
 import ToastContainer from 'src/components/ui/ToastContainer';
 import { LoginPage, RegisterPage } from 'src/modules/auth/AuthPages';
@@ -117,6 +117,9 @@ function AppShell() {
       reviews: useReviewStore,
       workouts: useWorkoutStore,
       priority: usePriorityStore,
+      agenda: useAgendaStore,
+      brain: useBrainStore,
+      config: useConfigStore,
     });
   }, []);
 

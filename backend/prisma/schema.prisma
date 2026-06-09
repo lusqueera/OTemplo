@@ -26,6 +26,8 @@ model User {
   reviews      Review[]
   notes        Note[]
   investments  Investment[]
+  appointments Appointment[]
+  config       UserConfig?
 }
 
 model Objective {
@@ -212,3 +214,40 @@ model Note {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model Appointment {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  date        String
+  time        String?
+  endTime     String?
+  type        String   @default("event")
+  status      String   @default("scheduled")
+  location    String?
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserConfig {
+  id             String   @id @default(uuid())
+  profileName    String   @default("Operador")
+  archetype      String   @default("Estrategista")
+  intensity      String   @default("high")
+  focusPhrase    String   @default("Execute com precisão.")
+  focusDuration  Int      @default(25)
+  notifications  Boolean  @default(true)
+  theme          String   @default("dark")
+  mood           String?
+  moodHistory    Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
